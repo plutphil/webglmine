@@ -891,6 +891,7 @@ void main() {
     }
   }
 
+  
   class BlockRegistry{
     constructor(){
       this.blocks=[];
