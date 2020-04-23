@@ -1,3 +1,4 @@
+
 function multiplyMatrixAndPoint(matrix, point) {
   // Give a simple variable name to each part of the matrix, a column and row number
   let c0r0 = matrix[ 0], c1r0 = matrix[ 1], c2r0 = matrix[ 2], c3r0 = matrix[ 3];
@@ -29,6 +30,7 @@ function multiplyMatrixAndPoint(matrix, point) {
 
 var gl = null;
 function main() {
+  
   const canvas = document.querySelector("#glcanvas");
   canvas.width  = window.innerWidth;
   canvas.height = window.innerHeight;
@@ -123,6 +125,59 @@ function main() {
     });
     return texture;
   }
+  class Shader{
+
+  }
+
+  class Shaders{
+    getCubeShader(){
+      if(this.cubeshader==null){
+        
+        function loadCubeShader(){  
+          const vsrc=`
+        
+        uniform mat4 u_matrix;
+        attribute vec4 aVertexPosition;
+        attribute vec2 a_texcoord;
+        varying vec2 vTextureCoord;
+        //varying vec3 vNormCord;
+        void main() {
+          gl_Position = u_matrix*aVertexPosition;
+          
+          //float l=dot(a_normal,normalize( 	vec3(0.3,1.,1.)))-0.2;
+          //float d=distance(aVertexPosition.xyz,vec3(4,5,6));
+          //float maxd=5.1;
+          //l=max(l,d<maxd?1.-(d/maxd):0.);
+          //float add=0.5;
+          //l=add+(1.-add)*l;
+          //vNormCord=vec3(l);
+          vTextureCoord=a_texcoord;
+        }
+              `;
+              const fsrc=`
+        #ifdef GL_ES
+        precision mediump float;
+        #endif
+        varying vec2 vTextureCoord;
+        uniform sampler2D u_texture;
+        uniform vec4 u_color;
+        //varying vec3 vNormCord;
+        void main() {
+          gl_FragColor = u_color*vec4(texture2D(u_texture,vTextureCoord));//texture2D(uSampler,vTextureCoord)+vec4(vTextureCoord, 1.0, 1.0);
+        }
+              `;
+              let prog=loadProgram(
+                vsrc,fsrc
+              );
+                return prog;
+            }
+      
+        this.cubeshader=loadCubeShader();
+      }
+      return this.cubeshader;
+    }
+  }
+  let shaders=new Shaders();
   class ModelBatch{
     constructor() {
       this.models=[];
@@ -264,6 +319,7 @@ void main() {
       gl.disableVertexAttribArray(this.locv);
     }
   }
+  
   class Cube extends Model{
     init(){
       this.dims=3;
@@ -277,6 +333,15 @@ void main() {
       this.texcoords=[];
       this.indices=[];
       this.col=[1,1,1,1];
+      this.prog=shaders.getCubeShader();
+      this.locv=gl.getAttribLocation(this.prog,"aVertexPosition");
+      this.loctc=gl.getAttribLocation(this.prog,"a_texcoord");
+      //this.locnorm=gl.getAttribLocation(this.prog,"a_normal");
+      
+      this.locmat=gl.getUniformLocation(this.prog,"u_matrix");
+      this.loctex=gl.getUniformLocation(this.prog,"u_texture");
+      this.loccol=gl.getUniformLocation(this.prog,"u_color");
+      this.indiceslength=0;
     }
     getAABB(){
       return this.aabbFromPoints(this.positions);
@@ -293,26 +358,59 @@ void main() {
       this.indices.push(l-2);
       this.indices.push(l-1);
     }
-    addQuad2(a,b,c,d,tca,tcb,tcc,tcd){
-      this.positions=this.positions.concat(a);
-      this.positions=this.positions.concat(b);
-      this.positions=this.positions.concat(c);
-      this.positions=this.positions.concat(d);
+    addV(v){
+      this.positions.push(v[0]);
+      this.positions.push(v[1]);
+      this.positions.push(v[2]);
+    }
+    addTC(tc){
+      this.texcoords.push(tc[0]);
+      this.texcoords.push(tc[1]);
+    }
+    addQuad2(a,b,c,d){
+      this.addV(a);
+      this.addV(b);
+      this.addV(c);
+      this.addV(d);
+      
       let l=Math.floor(this.positions.length/this.dims);
+      /*
       this.texcoords=this.texcoords.concat(tca);
       this.texcoords=this.texcoords.concat(tcb);
       this.texcoords=this.texcoords.concat(tcc);
       this.texcoords=this.texcoords.concat(tcd);
-      
+      */
       this.indices.push(l-3);
       this.indices.push(l-4);
       this.indices.push(l-2);
       
       this.indices.push(l-2);
       this.indices.push(l-4);
-      
       this.indices.push(l-1);
+
       
+    }
+    addTCQuad(tca,tcb,tcc,tcd){
+      this.addTC(tca);
+      this.addTC(tcb);
+      this.addTC(tcc);
+      this.addTC(tcd);
+    }
+    addTCGridAtlas(texi){
+      let y=Math.floor(texi/this.gw);
+      let x=texi-(y*this.gw);
+      let w=this.gw;
+      let h=this.gh;
+      let xs=1/w*x;
+      let xe=1/w*(x+1);
+      let ys=1/h*y;
+      let ye=1/h*(y+1);
+      this.addTCQuad(
+        [xs,ys],
+        [xs,ye],
+        [xe,ye],
+        [xe,ys]
+        );
     }
     addQuad(a,b,c,d){
       this.addQuad2(a,b,c,d,
@@ -322,16 +420,13 @@ void main() {
         [0,1]
         );
     }
-    addQuadGrid(a,b,c,d,x,y,w,h){
-      let xs=1/w*x;
-      let xe=1/w*(x+1);
-      let ys=1/h*y;
-      let ye=1/h*(y+1);
-      this.addQuad2(a,b,c,d,
+    addQuadGrid(a,b,c,d){
+      
+      this.addQuad2(a,b,c,d/*,
         [xs,ys],
         [xs,ye],
         [xe,ye],
-        [xe,ys]
+        [xe,ys]*/
         );
     }
     addNormal(x,y,z,t){
@@ -350,76 +445,69 @@ void main() {
         [minx,maxy,minz],
         [minx,miny,minz],
         [maxx,miny,minz], 
-        [maxx,maxy,minz], 
+        [maxx,maxy,minz]
        
-        gx,gy,this.gw,this.gh
+        
       );
       this.addQuadGrid( 
         [maxx,maxy,maxz], 
         [maxx,miny,maxz],
         [minx,miny,maxz],
-        [minx,maxy,maxz],
+        [minx,maxy,maxz]
         
-        gx,gy,this.gw,this.gh
       );
       this.addQuadGrid(
         [maxx,miny,maxz], 
         
         [maxx,miny,minz], 
         [minx,miny,minz],
-        [minx,miny,maxz],
-        gx,gy,this.gw,this.gh
+        [minx,miny,maxz]
       );
       this.addQuadGrid(
         
         [maxx,maxy,minz], 
         [maxx,maxy,maxz], 
         [minx,maxy,maxz],
-        [minx,maxy,minz],
-        gx,gy,this.gw,this.gh
+        [minx,maxy,minz]
       );
       this.addQuadGrid(
         [maxx,maxy,minz], 
         [maxx,miny,minz],
         [maxx,miny,maxz],
-        [maxx,maxy,maxz], 
+        [maxx,maxy,maxz]
        
        
-        gx,gy,this.gw,this.gh
       );
       this.addQuadGrid(
         [minx,maxy,maxz],
         [minx,miny,maxz], 
         
         [minx,miny,minz], 
-        [minx,maxy,minz],
-        
-        gx,gy,this.gw,this.gh
+        [minx,maxy,minz]
       );
     }
     addAABBSide(side,minx,miny,minz,maxx,maxy,maxz,texi){
-      let gy=Math.floor(texi/this.gw);
-      let gx=texi-(gy*this.gw);
+      //
       switch (side) {
         case 5:
           this.addQuadGrid(
             [minx,maxy,minz],
             [minx,miny,minz],
             [maxx,miny,minz], 
-            [maxx,maxy,minz], 
-            gx,gy,this.gw,this.gh
+            [maxx,maxy,minz]
           );
-          this.addNormal(0,0,-1,4);
+          this.addTCGridAtlas(texi);
+          //this.addNormal(0,0,-1,4);
           break;
           case 4:
  this.addQuadGrid( 
         [maxx,maxy,maxz], 
         [maxx,miny,maxz],
         [minx,miny,maxz],
-        [minx,maxy,maxz],
-        gx,gy,this.gw,this.gh
+        [minx,maxy,maxz]
       );
-      this.addNormal(0,0,1,4);
+      this.addTCGridAtlas(texi);
+      //this.addNormal(0,0,1,4);
           break;
           case 3:
   this.addQuadGrid(
@@ -427,10 +515,10 @@ void main() {
         
         [maxx,miny,minz], 
         [minx,miny,minz],
-        [minx,miny,maxz],
-        gx,gy,this.gw,this.gh
+        [minx,miny,maxz]
       );
-      this.addNormal(0,-1,0,4);
+      this.addTCGridAtlas(texi);
+      //this.addNormal(0,-1,0,4);
           break;
           case 2:
  this.addQuadGrid(
@@ -438,22 +526,20 @@ void main() {
         [maxx,maxy,minz], 
         [maxx,maxy,maxz], 
         [minx,maxy,maxz],
-        [minx,maxy,minz],
-        gx,gy,this.gw,this.gh
+        [minx,maxy,minz]
       );
-      this.addNormal(0,1,0,4);
+      this.addTCGridAtlas(texi);
+      //this.addNormal(0,1,0,4);
           break;
           case 0:
  this.addQuadGrid(
         [maxx,maxy,minz], 
         [maxx,miny,minz],
         [maxx,miny,maxz],
-        [maxx,maxy,maxz], 
-        
-       
-        gx,gy,this.gw,this.gh
+        [maxx,maxy,maxz]
       );
-      this.addNormal(1,0,0,4);
+      this.addTCGridAtlas(texi);
+      //this.addNormal(1,0,0,4);
           break;
           case 1:
  this.addQuadGrid(
@@ -461,22 +547,27 @@ void main() {
         [minx,miny,maxz], 
         
         [minx,miny,minz], 
-        [minx,maxy,minz],
-        
-        gx,gy,this.gw,this.gh
+        [minx,maxy,minz]
       );
-      this.addNormal(-1,0,0,4);
+      this.addTCGridAtlas(texi);
+      //this.addNormal(-1,0,0,4);
           break;
                                         
         default:
           break;
       }
       
-     
+    
     
      
      
      
+    }
+    clear(){
+      this.positions = [];
+      this.normals = [];
+      this.texcoords=[];
+      this.indices=[];
     }
     store() {
       //console.log("pos l:",this.positions.length/3);
@@ -493,7 +584,7 @@ void main() {
                 gl.deleteBuffer(this.vbuffer);
                 gl.deleteBuffer(this.tcbuffer);
                 gl.deleteBuffer(this.ibuffer);
-                gl.deleteBuffer(this.nbuffer);
+                //gl.deleteBuffer(this.nbuffer);
               }else{
                 gl.bindBuffer(gl.ARRAY_BUFFER,this.vbuffer);
                 gl.bufferSubData(gl.ARRAY_BUFFER,0,new Float32Array(this.positions));
@@ -501,8 +592,8 @@ void main() {
                 gl.bindBuffer(gl.ARRAY_BUFFER,this.tcbuffer);
                 gl.bufferSubData(gl.ARRAY_BUFFER,0,new Float32Array(this.texcoords));
 
-                gl.bindBuffer(gl.ARRAY_BUFFER,this.nbuffer);
-                gl.bufferSubData(gl.ARRAY_BUFFER,0,new Float32Array(this.normals));
+                //gl.bindBuffer(gl.ARRAY_BUFFER,this.nbuffer);
+                //gl.bufferSubData(gl.ARRAY_BUFFER,0,new Float32Array(this.normals));
                 
                 gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,this.ibuffer);
                 gl.bufferSubData(gl.ELEMENT_ARRAY_BUFFER,0,new Uint16Array(this.indices));
@@ -515,21 +606,17 @@ void main() {
           }
         }
       }
-      this.locv=gl.getAttribLocation(this.prog,"aVertexPosition");
-      this.loctc=gl.getAttribLocation(this.prog,"a_texcoord");
-      this.locnorm=gl.getAttribLocation(this.prog,"a_normal");
-      this.locmat=gl.getUniformLocation(this.prog,"u_matrix");
-      this.loctex=gl.getUniformLocation(this.prog,"u_texture");
-      this.loccol=gl.getUniformLocation(this.prog,"u_color");
+     
+      
       this.vbuffer = gl.createBuffer();
       gl.bindBuffer(gl.ARRAY_BUFFER,this.vbuffer);
       gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(this.positions),gl.STATIC_DRAW);
       this.tcbuffer = gl.createBuffer();
       gl.bindBuffer(gl.ARRAY_BUFFER,this.tcbuffer);
       gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(this.texcoords),gl.STATIC_DRAW);
-      this.nbuffer = gl.createBuffer();
-      gl.bindBuffer(gl.ARRAY_BUFFER,this.nbuffer);
-      gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(this.normals),gl.STATIC_DRAW);
+      //this.nbuffer = gl.createBuffer();
+      //gl.bindBuffer(gl.ARRAY_BUFFER,this.nbuffer);
+      //gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(this.normals),gl.STATIC_DRAW);
       this.ibuffer = gl.createBuffer();
       gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,this.ibuffer);
       gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,new Uint16Array(this.indices),gl.STATIC_DRAW);
@@ -547,7 +634,7 @@ void main() {
           0);
          
       gl.enableVertexAttribArray(this.locv);
-      gl.bindBuffer(gl.ARRAY_BUFFER, this.nbuffer);
+      /*gl.bindBuffer(gl.ARRAY_BUFFER, this.nbuffer);
       gl.vertexAttribPointer(
           this.locnorm,
           3,
@@ -555,9 +642,9 @@ void main() {
           false,
           0,
           0);
-         
+        
       gl.enableVertexAttribArray(this.locnorm);
-
+*/
       gl.bindBuffer(gl.ARRAY_BUFFER,this.tcbuffer);
       gl.vertexAttribPointer(
         this.loctc,
@@ -566,8 +653,9 @@ void main() {
         false,
         0,
         0);
+        
       gl.enableVertexAttribArray(this.loctc);
-      
+       
       gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.ibuffer);
       //gl.drawArrays(gl.TRIANGLE_STRIP, 0, this.positions.length/3);
       //console.log(mvp);
@@ -695,52 +783,14 @@ void main() {
       gl.disableVertexAttribArray(this.locv);
     }
   }
-  function loadCubeShader(){  
-  const vsrc=`
-
-uniform mat4 u_matrix;
-attribute vec4 aVertexPosition;
-attribute vec2 a_texcoord;
-attribute vec3 a_normal;
-varying vec2 vTextureCoord;
-varying vec3 vNormCord;
-void main() {
-  gl_Position = u_matrix*aVertexPosition;
-  
-  float l=dot(a_normal,normalize( 	vec3(0.3,1.,1.)))-0.2;
-  float d=distance(aVertexPosition.xyz,vec3(4,5,6));
-  float maxd=5.1;
-  //l=max(l,d<maxd?1.-(d/maxd):0.);
-  float add=0.5;
-  l=add+(1.-add)*l;
-  vNormCord=vec3(l);
-  vTextureCoord=a_texcoord;
-}
-      `;
-      const fsrc=`
-#ifdef GL_ES
-precision mediump float;
-#endif
-varying vec2 vTextureCoord;
-uniform sampler2D u_texture;
-uniform vec4 u_color;
-varying vec3 vNormCord;
-void main() {
-  gl_FragColor = vec4(vNormCord,1.)*u_color*vec4(texture2D(u_texture,vTextureCoord));//texture2D(uSampler,vTextureCoord)+vec4(vTextureCoord, 1.0, 1.0);
-}
-      `;
-      let prog=loadProgram(
-        vsrc,fsrc
-      );
-        return prog;
-    }
+ 
   //let p=new Plane();
   let cube=new Cube();
-  cube.prog=loadCubeShader();
+  cube.prog=shaders.getCubeShader();
   cube.gh=16;
   cube.gw=16;
   cube.tex=loadTexture("atlasmc.png");
-  const CHSIZE=8;
+  const CHSIZE=16;
   function loadLineShader(){
     const vsrc=`
   
@@ -1041,31 +1091,29 @@ void main() {
       this.meshgen=false;
     }
     genMesh(){
+      
       if(!this.meshgen){
-      this.cube.positions = [];
-      this.cube.texcoords=[];
-      this.cube.indices=[];
-      this.cube.normals=[];
-      for (let x = 0; x < CHSIZE; x++) {
-        for (let y = 0; y < CHSIZE; y++) {
-          for (let z = 0; z < CHSIZE; z++) {
-            if(this.data[x][y][z]!=0){
-              for (let s = 0; s < 6; s++) {
-                let near=addDir(s,[x,y,z]);
-                let block=this.getBlock(near[0],near[1],near[2]);
-                if(block.isGlassBlock()){
-                  this.cube.addAABBSide(s,x,y,z,x+1,y+1,z+1,this.getBlock(x,y,z).getTextureSide(s));
+        this.cube.clear();
+        for (let x = 0; x < CHSIZE; x++) {
+          for (let y = 0; y < CHSIZE; y++) {
+            for (let z = 0; z < CHSIZE; z++) {
+              if(this.data[x][y][z]!=0){
+                for (let s = 0; s < 6; s++) {
+                  let near=addDir(s,[x,y,z]);
+                  let block=this.getBlock(near[0],near[1],near[2]);
+                  if(block.isGlassBlock()){
+                    this.cube.addAABBSide(s,x,y,z,x+1,y+1,z+1,this.getBlock(x,y,z).getTextureSide(s));
+                  }
                 }
               }
+              
             }
-            
           }
         }
+        this.empty=this.cube.positions.length==0;
+        this.meshgen=true;
+        this.stored=false;
       }
-      this.empty=this.cube.positions.length==0;
-      this.meshgen=true;
-      this.stored=false;
-    }
      
     }
     storeMesh(){
@@ -1320,7 +1368,7 @@ void main() {
       }
     }
     generate(x,y,z){
-      let loaddistance=5;
+      let loaddistance=4;
       this.foreachChunk(this.pos[0],this.pos[1],this.pos[2],loaddistance,function(x,y,z){
         //chman.loadChunk(x,y,z).generate();
         console.log([x,y,z]);
@@ -1341,7 +1389,12 @@ void main() {
             }
           }else{
             if(this.loaded<this.loadlimit){
+              var t0 = performance.now()
+
               ch.genMesh();
+              
+            var t1 = performance.now()
+            console.log("genmesh " + (t1 - t0) + " milliseconds.")
               this.loaded++;
             }
             
@@ -1350,13 +1403,22 @@ void main() {
           if(ch.stored){
             
           }else{
+            
+            var t0 = performance.now()
             ch.storeMesh();
+            var t1 = performance.now()
+            console.log("stor " + (t1 - t0) + " milliseconds.")
           }
           ch.draw(mat4.translate(mat4.create(),mvp,[x*CHSIZE,y*CHSIZE,z*CHSIZE]));
         }else{
           if(this.loaded<this.loadlimit){
-          ch.generate();
-          this.loaded++;
+            if(!ch.generated){
+              var t0 = performance.now()
+              ch.generate();
+              var t1 = performance.now()
+              console.log("genwor " + (t1 - t0) + " milliseconds.")
+            }
+            this.loaded++;
           }
         }
         
@@ -1398,11 +1460,11 @@ void main() {
 
   var ch=new Chunk(0,0,0);
   ch.generate();
-  ch.cube.prog=loadCubeShader();
+  ch.cube.prog=shaders.getCubeShader();
   ch.cube.gh=16;
   ch.cube.gw=16;
  
-  var texatlas=loadTexture("atlasmc.png"); 
+  var texatlas=loadTexture("atlas.png"); 
   ch.cube.tex=texatlas;
   ch.genMesh();
   ch.storeMesh();
@@ -1619,10 +1681,11 @@ window.addEventListener('mousemove', e => {
     
   },false);
  
-  let maxfps=15;
+  let maxfps=60;
   console.log( ch);
   function update(){
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    
     var currentTime = (new Date).getTime();
     if (lastSquareUpdateTime) {
       var delta = currentTime - lastSquareUpdateTime;
@@ -1646,21 +1709,21 @@ window.addEventListener('mousemove', e => {
             if(keys[68])camera.move(0.1*delta,0,0);
       
       if(keys[72])camera.pos[1]=ch.getHeighest(Math.floor(camera.pos[0]),Math.floor(camera.pos[2]))+1.1;
-    if(keys[85]){
+  /*  if(keys[85]){
       let ch=chman.getChunk(chman.pos[0],chman.pos[1],chman.pos[2]);
       if(ch!=null){
         ch.meshgen=false;
         ch.stored=false;
       }
-    }
+    }*/
     if(mbutton.get( 0)) {
       if(bpos!=null){
         let c=chman.setBlock(bpos[0],bpos[1],bpos[2],0);
         
-        if(c!=null){
+        /*if(c!=null){
         c.genMesh();
         c.storeMesh();
-        }
+        }*/
       }
     }
     if(mbutton.get(2)) {
@@ -1669,10 +1732,10 @@ window.addEventListener('mousemove', e => {
       console.log(bpos);
       let nb=vec3.add(vec3.create(),bpos,addDir(bpos[5]));
       let c=chman.setBlock(nb[0],nb[1],nb[2],1);
-      if(c!=null){
+      /*if(c!=null){
         c.genMesh();
         c.storeMesh();
-      }
+      }*/
     }
     }
     
@@ -1692,8 +1755,8 @@ window.addEventListener('mousemove', e => {
     chman.loaded=0;
     chman.draw(mvp);
     //ch.draw(mvp);
-    pointa.mat=mat4.translate(mat4.create(),mvp,vecpa);
-    pointa.draw();
+    //pointa.mat=mat4.translate(mat4.create(),mvp,vecpa);
+    //pointa.draw();
     
     
     //
@@ -1702,7 +1765,8 @@ window.addEventListener('mousemove', e => {
     
     //defaultBatch.draw(mvp);
     
-    setTimeout(update, delay);
+    
+    window.requestAnimationFrame(update);
   }
   update();
   
