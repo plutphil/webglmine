@@ -71,4 +71,5 @@ function k(){
     }
     var t1 = performance.now()
     console.log("smartpush update 3 float took " + (t1 - t0) + " milliseconds.")
-    };k();
+    };
+    //k();
