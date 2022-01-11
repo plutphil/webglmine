@@ -1,12 +1,12 @@
 var gl = null;
-
+var chman = null;
 
 function main() {
     var ch;
   const canvas = document.querySelector("#glcanvas");
   canvas.width  = window.innerWidth;
   canvas.height = window.innerHeight;
-  canvas.style.cursor = 'none';
+  //canvas.style.cursor = 'none';
   gl = canvas.getContext("webgl");
   
   if (!gl) {
@@ -34,12 +34,6 @@ function main() {
   //var defaultBatch=new ModelBatch();
  
   
-  
-  
-  
-  
-  
- 
   //let p=new Plane();
   var texatlas=loadTexture("atlas.png");
   let cube=new Cube();
@@ -119,19 +113,14 @@ function main() {
   
  
   let blockreg=new BlockRegistry();
-
-  
-
-  let stone=new BlockType();
-  stone.tex=3;
-  stone.textures[2]=0;
-  stone.textures[3]=2;
-  
-  blockreg.addBlock(stone);
-
-  stone=new BlockType();
-  stone.tex=1;
-  blockreg.addBlock(stone);
+blockreg.newBlock("grass",[3,0,2]);
+blockreg.newBlock("stone",1);
+blockreg.newBlock("dirt",2);
+blockreg.newBlock("wood",4);
+blockreg.newBlock("bricks",7);
+blockreg.newBlock("cobble",16);
+blockreg.addBlock(new BlockTypeFlower(28));
+//blockreg.newBlock("",);
 
 
   
@@ -146,7 +135,7 @@ function main() {
   noise.seed(Math.random());
 
   
-  var chman=new ChunkManager();
+  chman=new ChunkManager();
   chman.cube = cube;
   chman.blockreg=blockreg;
   ch=new Chunk(0,0,0);
@@ -202,7 +191,7 @@ function main() {
     
     return pos;  
   }
-  
+  var cameramoving = false;
 window.addEventListener('mousemove', e => {
 
   //mpos = getNoPaddingNoBorderCanvasRelativeMousePosition(e, gl.canvas);
@@ -218,6 +207,7 @@ window.addEventListener('mousemove', e => {
       e.mozMovementY      ||
       e.webkitMovementY   ||
       0;
+      if(cameramoving)
   camera.rotate(-movementY/10,-movementX/10,0);
   //console.log([gl_mx,gl_my]);
   //console.log(e); 
@@ -230,10 +220,18 @@ window.addEventListener('mousemove', e => {
   
   var keys = {};
 
-  window.addEventListener('keydown',function(e) { keys[e.keyCode] = true;
+  window.addEventListener('keydown',function(e) { 
+    e.preventDefault();
+    keys[e.keyCode] = true;
+    if(e.keyCode==27){
+      cameramoving = false;
+    }
     //alert(e.keyCode);
   },false);
-  window.addEventListener('keyup',function(e) { keys[e.keyCode] = false; },false);
+  window.addEventListener('keyup',function(e) {
+     keys[e.keyCode] = false; 
+     console.log(e);
+    },false);
   
  
   window.addEventListener('resize', resizeCanvas, false);
@@ -289,7 +287,7 @@ window.addEventListener('mousemove', e => {
   
   let element=canvas;
  
-
+  
   var mbutton=new Map();
   canvas.addEventListener('mousedown', function(evt) {
     mbutton.set(evt.button,1);
@@ -299,6 +297,12 @@ window.addEventListener('mousemove', e => {
     mbutton.set(evt.button,0);
     
   });
+  document.addEventListener('pointerlockchange', (e)=>{
+    //console.log(e);
+    if(document.pointerLockElement!==canvas){
+      cameramoving=false;
+    }
+  }, false);
   canvas.addEventListener("click",function() {
     
     
@@ -307,18 +311,25 @@ window.addEventListener('mousemove', e => {
     canvas.webkitRequestPointerLock;
     // Ask the browser to lock the pointer
     canvas.requestPointerLock();
+    cameramoving=true;
     
   },false);
  
   let maxfps=60;
   console.log( ch);
 	console.log(chman);
+  let lastcamrot = camera.rot;
+  let lastcampos = camera.pos;
+  let rgbodypos = new Float32Array([5,20,6]);
+  var delta = 1;
+  let vy = 0.;
+  var onground= false;
   function update(){
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     
     var currentTime = (new Date).getTime();
     if (lastSquareUpdateTime) {
-      var delta = currentTime - lastSquareUpdateTime;
+      delta = currentTime - lastSquareUpdateTime;
       squareRotation += (30 * delta) / 1000.0;
     }
     let delay=0;
@@ -328,17 +339,115 @@ window.addEventListener('mousemove', e => {
     
     lastSquareUpdateTime = currentTime;
     delta=delta/10;
+    let rotspeed=1.;
+    let speed=0.1;
+    //console.log(delta);
     
-      if(keys[37])  camera.rotate(0,1*delta,0); 
-      if(keys[38])  camera.rotate(1*delta,0,0);
-        if(keys[39])  camera.rotate(0,-1*delta,0); 
-          if(keys[40])  camera.rotate(-1*delta,0,0);
-      if(keys[83])camera.move(0,0,0.1*delta);
-        if(keys[87])camera.move(0,0,-0.1*delta);
-          if(keys[65])camera.move(-0.1*delta,0,0);
-            if(keys[68])camera.move(0.1*delta,0,0);
+    if(!onground){
+      vy += -0.007*delta;
+      vy = Math.max(vy,-1);
+    }
+    if(keys[32]){
+      if(onground){
+        vy=0.2;
+        onground=false;
+      }
+    }
+    let vx = 0;
+    let vz = 0;
+    let rbspeed = 0.1;
+    if(keys[37])   vx=-delta*rbspeed;
+    if(keys[39])  vx=delta*rbspeed; 
+    if(keys[38])  vz=-delta*rbspeed; 
+    if(keys[40]) vz=delta*rbspeed; 
+    let ax = 0;
+    let ay = 0;
+    if(keys[83])ay=1;
+    if(keys[87])ay=-1;
+    if(keys[65])ax=-1;
+    if(keys[68])ax=1;
+    let a = degToRad(-camera.rot[1]);
+    vx = (ax*Math.cos(a)-ay*Math.sin(a))*delta*rbspeed;
+    vz = (ax*Math.sin(a)+ay*Math.cos(a))*delta*rbspeed;
+    
+    if(keys[81]){
+      rgbodypos=[0,20,0];
+    }
+    let sx = 0.8;
+    let sy = 1.8;
+    let sz = 0.8;
+    let checkcolliding=()=>{
       
-      if(keys[72])camera.pos[1]=ch.getHeighest(Math.floor(camera.pos[0]),Math.floor(camera.pos[2]))+1.1;
+      let bsx = Math.ceil(sx);
+      let bsy = Math.ceil(sy);
+      let bsz = Math.ceil(sz);
+      let bx = Math.floor(rgbodypos[0]);
+      let by = Math.floor(rgbodypos[1]);
+      let bz = Math.floor(rgbodypos[2]);
+      for (let x = 0; x < bsx+1; x++) {
+        for (let y = 0; y < bsy+1; y++) {
+          for (let z = 0; z < bsz+1; z++) {
+            let b = chman.getBlockCached2(bx+x,by+y,bz+z);
+            if(b !=0){
+              if(aabbaabbcollide(bx+x,by+y,bz+z,bx+x+1,by+y+1,bz+z+1,
+                rgbodypos[0],rgbodypos[1],rgbodypos[2],
+                rgbodypos[0]+sx,rgbodypos[1]+sy,rgbodypos[2]+sz
+                ))
+              return true;
+            }
+          }
+        }
+      }
+      return false;
+    };
+    onground=false;
+    rgbodypos[1]+=vy;
+    if(checkcolliding()){
+      rgbodypos[1]-=vy;
+      if(vy<0){
+        onground=true;
+        //console.log("onground");
+      }
+    }
+    rgbodypos[0]+=vx;
+    if(checkcolliding()){
+      rgbodypos[0]-=vx;
+    }
+    rgbodypos[2]+=vz;
+    if(checkcolliding()){
+      rgbodypos[2]-=vz;
+    }
+    
+    if(keys[17])speed=1.;
+      /*if(keys[37])  camera.rotate(0,rotspeed*delta,0); 
+      if(keys[38])  camera.rotate(rotspeed*delta,0,0);
+      if(keys[39])  camera.rotate(0,-rotspeed*delta,0); 
+      if(keys[40])  camera.rotate(-rotspeed*delta,0,0);*/
+      /*if(keys[83])camera.move(0,0,speed*delta);
+      if(keys[87])camera.move(0,0,-speed*delta);
+      if(keys[65])camera.move(-speed*delta,0,0);
+      if(keys[68])camera.move(speed*delta,0,0);*/
+
+      //if(keys[16])camera.translate(0,-speed*delta,0);
+      //if(keys[32])camera.translate(0,speed*delta,0);
+      if(keys[69]){
+        //camera.setPosition(rgbodypos[0],rgbodypos[1],rgbodypos[2]);
+        rgbodypos=[0,20,0];
+      }
+      camera.setPosition(rgbodypos[0]+sx/2.,rgbodypos[1]+1.7,rgbodypos[2]+sx/2.);
+      // key h 
+      if(keys[72]){
+        let ch2 = chman.getChunk(
+          Math.floor(camera.pos[0]/CHSIZE),
+          Math.floor(camera.pos[1]/CHSIZE),
+          Math.floor(camera.pos[2]/CHSIZE)
+        );
+        camera.pos[1]=ch2.
+          getHeighest(
+            Math.floor(camera.pos[0])-ch2.x*CHSIZE,
+            Math.floor(camera.pos[2])-ch2.z*CHSIZE
+          )+1.1;
+      }
   /*  if(keys[85]){
       let ch=chman.getChunk(chman.pos[0],chman.pos[1],chman.pos[2]);
       if(ch!=null){
@@ -362,26 +471,31 @@ window.addEventListener('mousemove', e => {
       console.log(bpos);
       let nb=vec3.add(vec3.create(),bpos,addDir(bpos[5]));
       let c=chman.setBlock(nb[0],nb[1],nb[2],1);
-      /*if(c!=null){
+      /*if(c!=nulleqffhh){
         c.genMesh();
         c.storeMesh();
       }*/
     }
     }
-    
     //let inverted=mat4.invert(mat4.create(),matrixmodelviewprojection);
     let mvp=camera.getMVP();
-    
-   
-
-
-    bpos=chman.getRay(camera.pos,camera.getRay(gl_mx,gl_my));
+    if(lastcamrot!=camera.rot){
+      bpos=chman.getRay(camera.pos,camera.getRay(gl_mx,gl_my));
+      lastcamrot=camera.rot;
+    }
+    if(lastcampos!=camera.pos){
+      bpos=chman.getRay(camera.pos,camera.getRay(gl_mx,gl_my));
+      lastcampos=camera.pos;
+      chman.setPos(camera.pos[0],camera.pos[1],camera.pos[2]);
+    }
     if(bpos!=null){
       lines.draw(mat4.translate(mat4.create(),mvp,bpos));
       //let pts=rayaabbintersection(camera.pos,camera.getRay(),bpos,vec3.add(vec3.create(),bpos,[1,1,1]));
       
     }
-    chman.setPos(camera.pos[0],camera.pos[1],camera.pos[2]);
+    //rgbodypos-=0.01;
+    //lines.draw(mat4.scale(mat4.create(),mat4.translate(mat4.create(),mvp,rgbodypos),[sx,sy,sz]));
+    
     chman.loaded=0;
     chman.draw(mvp);
     //ch.draw(mvp);

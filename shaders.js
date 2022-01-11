@@ -10,8 +10,17 @@ getCubeShader(){
 	attribute vec4 aVertexPosition;
 	attribute vec2 a_texcoord;
 	attribute vec3 a_normal;
+
+	uniform vec4 pointlight_pos;
+	uniform vec3 pointlight_color;
+	
+	uniform vec3 dirlight_color;
+	uniform vec3 dirlight_dir;
+	
 	varying vec2 vTextureCoord;
 	varying vec3 vNormCord;
+	varying vec3 color;
+	
 	void main() {
 	  
 	  float l=dot(a_normal,normalize( 	vec3(0.3,1.,1.)));
@@ -22,9 +31,10 @@ getCubeShader(){
 	  //l=add+(1.-add)*l;
 	  vNormCord=vec3(1.);
 	  vTextureCoord=a_texcoord;
-
+	  vec4 pos = u_matrix*aVertexPosition;
+		color=pointlight_color*max(0.,1.-distance(pos.xyz,pointlight_pos.xyz)/pointlight_pos.w);
 	  
-	  gl_Position = u_matrix*aVertexPosition;
+	  gl_Position = pos;
 	}
 		  `;
 		  
@@ -36,12 +46,14 @@ varying vec2 vTextureCoord;
 uniform sampler2D u_texture;
 uniform vec4 u_color;
 varying vec3 vNormCord;
+
+varying vec3 color;
 void main() {
 	vec4 texColor= texture2D(u_texture,vTextureCoord);
 	if(texColor.a < 0.1)
         discard;
 	texColor=vec4(texColor.rgb*vNormCord.x,texColor.a);
-  	gl_FragColor = u_color*texColor;//texture2D(uSampler,vTextureCoord)+vec4(vTextureCoord, 1.0, 1.0);
+  	gl_FragColor = vec4(color*texColor.xyz,texColor.a);//texture2D(uSampler,vTextureCoord)+vec4(vTextureCoord, 1.0, 1.0);
 }
 		  `;	
 		  
