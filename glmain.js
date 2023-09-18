@@ -2,7 +2,7 @@ var gl = null;
 var chman = null;
 
 function main() {
-    var ch;
+  var ch;
   const canvas = document.querySelector("#glcanvas");
   canvas.width  = window.innerWidth;
   canvas.height = window.innerHeight;
@@ -43,7 +43,7 @@ function main() {
   cube.tex=texatlas;
   cube.addAABB(0,0,0,10,10,10,5);
   cube.store();
-  console.log(cube);
+  //console.log(cube);
   function loadLineShader(){
     const vsrc=`
   
@@ -113,19 +113,15 @@ function main() {
   
  
   let blockreg=new BlockRegistry();
-blockreg.newBlock("grass",[3,0,2]);
-blockreg.newBlock("stone",1);
-blockreg.newBlock("dirt",2);
-blockreg.newBlock("wood",4);
-blockreg.newBlock("bricks",7);
-blockreg.newBlock("cobble",16);
-blockreg.addBlock(new BlockTypeFlower(28));
-//blockreg.newBlock("",);
+  blockreg.newBlock("grass",[3,0,2]);
+  blockreg.newBlock("stone",1);
+  blockreg.newBlock("dirt",2);
+  blockreg.newBlock("wood",4);
+  blockreg.newBlock("bricks",7);
+  blockreg.newBlock("cobble",16);
+  blockreg.addBlock(new BlockTypeFlower(28));
+  //blockreg.newBlock("",);
 
-
-  
-  
-  
   function getOrSetNewMap(m,k){
     if(m.get(k)==null){
       m.set(k,new Map());
@@ -151,8 +147,9 @@ blockreg.addBlock(new BlockTypeFlower(28));
   var hitchunk=null;
   
   chman.setPos(0,0,0);
+  let starttime = performance.now();
   chman.generate(0,0,0);
-  
+  console.log("generation time",(performance.now()-starttime)/1000);
   //cube.addAABB(-0.5,-0.5,-0.5,0.5,0.5,0.5,0);//Math.round(Math.random()*100.));
   //cube.store();
   gl.viewport(0,0,gl.canvas.width,gl.canvas.height);
@@ -230,7 +227,7 @@ window.addEventListener('mousemove', e => {
   },false);
   window.addEventListener('keyup',function(e) {
      keys[e.keyCode] = false; 
-     console.log(e);
+     //console.log(e);
     },false);
   
  
@@ -316,8 +313,8 @@ window.addEventListener('mousemove', e => {
   },false);
  
   let maxfps=60;
-  console.log( ch);
-	console.log(chman);
+  //console.log( ch);
+	//console.log(chman);
   let lastcamrot = camera.rot;
   let lastcampos = camera.pos;
   let rgbodypos = new Float32Array([5,20,6]);

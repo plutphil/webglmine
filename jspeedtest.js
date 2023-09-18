@@ -1,7 +1,7 @@
 function k(){
 
     let f=[1.333,0.3343234,0.312312];
-    let steps=500000;
+    let steps=100000;
     //takes way to long
     /*
     var t0 = performance.now()
@@ -71,5 +71,29 @@ function k(){
     }
     var t1 = performance.now()
     console.log("smartpush update 3 float took " + (t1 - t0) + " milliseconds.")
-    };
-    //k();
+    
+    var t0 = performance.now()
+    
+    index=0;
+    arr = new Float32Array(steps*3);
+    for (let i = 0; i < steps; i++) {
+        
+        arr[i*3]=f[0];
+        arr[i*3+1]=f[1];
+        arr[i*3+2]=f[2];
+        
+    }
+    var t1 = performance.now()
+    console.log("array set 3 float took " + (t1 - t0) + " milliseconds.")
+    arr = new ArrayList2(Uint8Array);
+    var t0 = performance.now()
+    index=0;
+    for (let i = 0; i < steps; i++) {
+        arr.add(f[0])
+        arr.add(f[1])
+        arr.add(f[2])
+    }
+    var t1 = performance.now()
+    console.log("arraylist add 3 float took " + (t1 - t0) + " milliseconds.")
+};
+k();

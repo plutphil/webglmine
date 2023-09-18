@@ -1,10 +1,10 @@
 
-class Shaders{
-getCubeShader(){
-  if(this.cubeshader==null){
-	
-	function loadCubeShader(){  
-	  const vsrc=`
+class Shaders {
+	getCubeShader() {
+		if (this.cubeshader == null) {
+
+			function loadCubeShader() {
+				const vsrc = `
 	
 	uniform mat4 u_matrix;
 	attribute vec4 aVertexPosition;
@@ -18,7 +18,7 @@ getCubeShader(){
 	uniform vec3 dirlight_dir;
 	
 	varying vec2 vTextureCoord;
-	varying vec3 vNormCord;
+	varying vec3 vNormCord; 
 	varying vec3 color;
 	
 	void main() {
@@ -29,17 +29,16 @@ getCubeShader(){
 	  //l=max(l,d<maxd?1.-(d/maxd):0.);
 	  //float add=0.5;
 	  //l=add+(1.-add)*l;
-	  vNormCord=vec3(1.);
-	  vTextureCoord=a_texcoord;
+	  vNormCord=a_normal;
+	  vTextureCoord=a_texcoord*(1./16.);
 	  vec4 pos = u_matrix*aVertexPosition;
-		color=pointlight_color*max(0.,1.-distance(pos.xyz,pointlight_pos.xyz)/pointlight_pos.w);
-	  
+	  color=pointlight_color*max(0.,1.-distance(pos.xyz,pointlight_pos.xyz)/pointlight_pos.w);
 	  gl_Position = pos;
 	}
 		  `;
-		  
-		  const fsrc=`
-		  #ifdef GL_ES
+
+				const fsrc = `
+#ifdef GL_ES
 precision mediump float;
 #endif
 varying vec2 vTextureCoord;
@@ -52,19 +51,19 @@ void main() {
 	vec4 texColor= texture2D(u_texture,vTextureCoord);
 	if(texColor.a < 0.1)
         discard;
-	texColor=vec4(texColor.rgb*vNormCord.x,texColor.a);
-  	gl_FragColor = vec4(color*texColor.xyz,texColor.a);//texture2D(uSampler,vTextureCoord)+vec4(vTextureCoord, 1.0, 1.0);
+	//texColor=vec4(texColor.rgb*dot(vNormCord,vec3(1.,-1.,1.)),texColor.a);
+  	gl_FragColor = vec4(texColor.xyz,texColor.a);//texture2D(uSampler,vTextureCoord)+vec4(vTextureCoord, 1.0, 1.0);
 }
-		  `;	
-		  
-		  let prog=loadProgram(
-			vsrc,fsrc
-		  );
-			return prog;
+		  `;
+
+				let prog = loadProgram(
+					vsrc, fsrc
+				);
+				return prog;
+			}
+
+			this.cubeshader = loadCubeShader();
 		}
-  
-	this.cubeshader=loadCubeShader();
-  }
-  return this.cubeshader;
-}
+		return this.cubeshader;
+	}
 }
