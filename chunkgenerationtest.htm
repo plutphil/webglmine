@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    <script src="util.js"></script>
+    <script src="perlin.js"></script>
+    <script src="ChunkMesh.js"></script>
+    <script src="Chunk.js"></script>
+    <script src="ChunkManager.js"></script>
+    <script src="Block.js"></script>
+    <script src="Generator.js"></script>
+    
+    <script>
+        log=(...a)=>{
+            console.log(a);
+            let logentry=document.createElement("div");
+            logentry.innerText=String(a);
+            document.body.appendChild(logentry);
+        }
+        mesureRunTime=(fun)=>{
+            const endtime = performance.now()+100;
+            cnt = 0;
+            do{
+                fun();
+                cnt++;
+            }while(endtime>=performance.now());
+            return 100/cnt;
+        }
+        const chunkWorker = new Worker("ChunkWorker.js");
+        const chunkMeshWorker = new Worker("ChunkMeshWorker.js");
+
+        let blockreg=new BlockRegistry();
+        blockreg.newBlock("grass",[3,0,2]);
+        blockreg.newBlock("stone",1);
+        blockreg.newBlock("dirt",2);
+        blockreg.newBlock("wood",4);
+        blockreg.newBlock("bricks",7);
+        blockreg.newBlock("cobble",16);
+        blockreg.addBlock(new BlockTypeFlower(28));
+        var chman=new ChunkManager();
+        chman.blockreg=blockreg;
+        
+        var generator=new Generator();
+
+
+
+        let ch = new Chunk(0,0,0);
+
+        generator.generateChunk(ch);
+        ch.genMesh(chman);
+        chunkWorker.onmessage=e=>{
+            log("recv",performance.now());
+        }
+        log("send",performance.now());
+        chunkWorker.postMessage(ch)
+        
+        chman.foreachChunk(0,0,0,4,(x, y, z, chman)=>{
+            log("send",performance.now());
+            chunkWorker.postMessage(new Chunk(x,y,z))
+        })
+    
+
+        //log(mesureRunTime(()=>generator.generateChunk(new Chunk())))
+        log(ch)
+        
+    </script>
+</body>
+</html>

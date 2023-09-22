@@ -2,17 +2,18 @@ class Chunk extends Model {
   constructor(x, y, z) {
     super();
     this.neighbours = new Array(6);
-    let data = new Uint8Array(CHSIZE * CHSIZE * CHSIZE);
+    let data=null;
 
-    this.cube = new Cube();
-    this.cube.enabled = true;
+    //this.cube = new Cube();
+    //this.cube.enabled = true;
+    this.cube = new ChunkMesh();
     this.data = data;
     this.enabled = false;
     this.meshgen = false;
     this.generated = false;
     this.stored = false;
     this.updated = false;
-    this.empty = false;
+    this.empty = true;
     if (x != null) {
       this.x = x;
       this.y = y;
@@ -20,57 +21,23 @@ class Chunk extends Model {
     }
     this.structures = [];
   }
+  initdata(){
+    this.data = new Uint8Array(CHSIZE * CHSIZE * CHSIZE);
+  }
   getblock(x, y, z) {
+    if(this.empty)return 0;
     return this.data[x * CHSIZE * CHSIZE + y * CHSIZE + z];
   }
   setblock(x, y, z, i) {
-    this.data[x * CHSIZE * CHSIZE + y * CHSIZE + z] = i;
-  }
-  generate() {
-    let rx = 0;
-    let ry = 0;
-    let rz = 0;
-    if (!this.generated) {
-      for (let x = 0; x < CHSIZE; x++) {
-        rx = x + (this.x * CHSIZE);
-        for (let z = 0; z < CHSIZE; z++) {
-          rz = z + (this.z * CHSIZE);
-          let val = Math.round(noise.simplex2(rx / 50., rz / 50.) * 5 + 5);
-          for (let y = 0; y < CHSIZE; y++) {
-            let ry = y + (this.y * CHSIZE);
-            if (ry <= val) {
-              if (ry < val) {
-                this.setblock(x, y, z, 2)
-              } else {
-                this.setblock(x, y, z, 1);
-              }
-
-            } else {
-              if (ry == val + 1) {
-                if (Math.random() < 0.01)
-                  //this.data[x][y][z]=7;
-                  this.setblock(x, y, z, 7)
-              } else {
-                this.setblock(x, y, z, 0)
-              }
-            }
-            if (noise.simplex3(rx / 50., ry / 50., rz / 50.) > 0.5) {
-              this.setblock(x, y, z, 0)
-            }
-
-
-          }
-
-        }
+    
+    if(this.data==null){
+      if(i!=0){
+        this.initdata();
+        this.empty = false;
       }
-      /*let numtrees = Math.round(Math.random()*10.);
-      for(let i = 0;i<numtrees;i++){
-        let x = Math.round(Math.random()*CHSIZE);
-        let z = Math.round(Math.random()*CHSIZE);
-        while()
-      }*/
+      return;
     }
-    this.generated = true;
+    this.data[x * CHSIZE * CHSIZE + y * CHSIZE + z] = i;
   }
   update() {
     this.meshgen = false;
@@ -102,12 +69,13 @@ class Chunk extends Model {
       this.empty = this.cube.positions.length == 0;
       this.meshgen = true;
       this.stored = false;
+      this.cube.convert();
     }
 
   }
   storeMesh() {
     //this.cube.enabled=false;
-    this.cube.store();
+    //this.cube.store();
     this.stored = true;
     //this.cube.enabled=true;
   }
@@ -138,11 +106,11 @@ class Chunk extends Model {
     }
   }
   getBlock(x, y, z, chman) {
-
     return chman.blockreg.getBlock(this.getBlockid(x, y, z, chman));
   }
 
   getRay(from, to, chman) {
+    if(this.empty)return null;
     if (this.cube.positions.length == 0) { return null; }
     let pos = [this.x * CHSIZE, this.y * CHSIZE, this.z * CHSIZE];
     if (rayaabb(from, to, pos, vec4.add(vec3.create(), pos, [CHSIZE, CHSIZE, CHSIZE]))) {
@@ -206,7 +174,7 @@ class Chunk extends Model {
 
   }
   draw(mvp) {
-    this.cube.draw(mvp);
+    //this.cube.draw(mvp);
   }
   hasAllNeighbours(chman) {
     for (let i = 0; i < 6; i++) {

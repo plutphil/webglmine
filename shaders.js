@@ -30,7 +30,7 @@ class Shaders {
 	  //float add=0.5;
 	  //l=add+(1.-add)*l;
 	  vNormCord=a_normal;
-	  vTextureCoord=a_texcoord*(1./16.);
+	  vTextureCoord=a_texcoord/16.;
 	  vec4 pos = u_matrix*aVertexPosition;
 	  color=pointlight_color*max(0.,1.-distance(pos.xyz,pointlight_pos.xyz)/pointlight_pos.w);
 	  gl_Position = pos;

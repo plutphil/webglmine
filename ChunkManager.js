@@ -2,7 +2,7 @@ class ChunkManager {
   constructor() {
     this.chunks = new Map();
     this.pos = [0, 0, 0];
-    this.loadlimit = 2;
+    this.loadlimit = 3;
     this.loaded = 0;
     this.cube = undefined;
     this.blockreg = undefined;
@@ -109,16 +109,24 @@ class ChunkManager {
     return ch;
   }
   loadch(c) {
-    c.cube.setShader(this.cube.prog);
+    /*c.cube.setShader(this.cube.prog);
     c.cube.gh = 16;
     c.cube.gw = 16;
-    c.cube.tex = this.cube.tex;
+    c.cube.tex = this.cube.tex;*/
     this.addChunk(c);
     //console.log([x,y,z]);
     return c;
   }
   foreachChunk(x, y, z, d, f) {
-
+    // diamond trapez shape iteration 
+    /*1  2    3
+      ##  ##    ##
+      ## #  #  #  #
+         #  # #    #
+          ##  #    #
+               #  # 
+                ##
+    */
     for (let a = 0; a < d; a++) {
       for (let b = 0; b < a; b++) {
         for (let c = 0; c < b; c++) {
@@ -153,7 +161,7 @@ class ChunkManager {
     z = Math.round(z / CHSIZE);
 
 
-    let renderdistance = 8;
+    let renderdistance = 16;
     if (this.pos[0] != x || this.pos[1] != y || this.pos[2] != z) {
       this.pos = [x, y, z];
       this.drawlist = [];
@@ -165,20 +173,21 @@ class ChunkManager {
   }
   generate(x, y, z) {
     let loaddistance = 10;
+    let ch;
     this.foreachChunk(this.pos[0], this.pos[1], this.pos[2], loaddistance, function (x, y, z, chman) {
-      let ch = chman.loadChunk(x, y, z);
-      ch.generate();
+      ch = chman.loadChunk(x, y, z);
+      //ch.generate();
       //console.log([x,y,z]);
       chman.drawlist.push(ch);
     });
+    ///chunkWorker.postMessage(ch); 
+      
   }
   drawChunk(ch, mvp) {
     if (ch != null) {
       if (ch.generated) {
         if (ch.meshgen) {
-          if (ch.updated) {
-
-          } else {
+          if (!ch.updated) {
             if (ch.hasAllNeighbours(this)) {
               ch.meshgen = false;
               ch.updated = true;
@@ -189,16 +198,18 @@ class ChunkManager {
               this.loadChunk(ch.x, ch.y - 1, ch.z);
               this.loadChunk(ch.x, ch.y, ch.z + 1);
               this.loadChunk(ch.x, ch.y, ch.z - 1);
-
             }
           }
         } else {
           if (this.loaded < this.loadlimit) {
-            var t0 = performance.now()
+            //var t0 = performance.now()
 
-            ch.genMesh(this);
-
-            var t1 = performance.now()
+            //ch.genMesh(this);
+            gpumesh = ch.gpumesh;
+            ch.gpumesh=null;
+            chunkWorker.postMessage(ch);
+            ch.gpumesh=gpumesh;
+            //var t1 = performance.now()
             //console.log("genmesh " + (t1 - t0) + " milliseconds.")
             this.loaded++;
           }
@@ -206,21 +217,35 @@ class ChunkManager {
         }
 
         if (ch.stored) {
-
+          
+          
         } else {
-
-          var t0 = performance.now()
-          ch.storeMesh();
-          var t1 = performance.now()
+          if(ch.gpumesh==null){
+            ch.gpumesh=GPUMesh();
+          }
+          try {
+            chunkRenderer.store(ch.cube, ch.gpumesh);
+            ch.stored=true;
+            
+          } catch (error) {
+            console.log(error,ch);
+          }
+          //var t0 = performance.now()
+          //ch.storeMesh();
+          //var t1 = performance.now()
           //console.log("stor " + (t1 - t0) + " milliseconds.")
         }
-        ch.draw(mat4.translate(mat4.create(), mvp, [ch.x * CHSIZE, ch.y * CHSIZE, ch.z * CHSIZE]));
+        let movedmat = mat4.translate(mat4.create(), mvp, [ch.x * CHSIZE, ch.y * CHSIZE, ch.z * CHSIZE])
+        chunkRenderer.draw(ch.gpumesh,movedmat);
+        //ch.draw(mat4.translate(mat4.create(), mvp, [ch.x * CHSIZE, ch.y * CHSIZE, ch.z * CHSIZE]));
       } else {
         if (this.loaded < this.loadlimit) {
           if (!ch.generated) {
-            var t0 = performance.now()
-            ch.generate();
-            var t1 = performance.now()
+            chunkWorker.postMessage(ch);
+            //var t0 = performance.now()
+            //ch.generate();
+            //generator.generateChunk(ch);
+            //var t1 = performance.now()
             //console.log("genwor " + (t1 - t0) + " milliseconds.")
           }
           this.loaded++;
